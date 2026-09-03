@@ -1,0 +1,28 @@
+Create DB Schema and:
+
+INSERT INTO tasks (
+  id,
+  unique_key,
+  queue_name,
+  payload,
+  status,
+  priority,
+  max_retries,
+  current_retry,
+  execute_at,
+  created_at,
+  updated_at
+)
+VALUES (
+  UNHEX(REPLACE(UUID(), '-', '')),
+  'demo-task-001',
+  'default',
+  '{"orderId": 123, "type": "email"}',
+  'PENDING',
+  10,
+  3,
+  0,
+  NOW(3),
+  NOW(3),
+  NOW(3)
+);
