@@ -1,28 +1,14 @@
-Create DB Schema and:
-
-INSERT INTO tasks (
-  id,
-  unique_key,
-  queue_name,
-  payload,
-  status,
-  priority,
-  max_retries,
-  current_retry,
-  execute_at,
-  created_at,
-  updated_at
-)
-VALUES (
-  UNHEX(REPLACE(UUID(), '-', '')),
-  'demo-task-001',
-  'default',
-  '{"orderId": 123, "type": "email"}',
-  'PENDING',
-  10,
-  3,
-  0,
-  NOW(3),
-  NOW(3),
-  NOW(3)
-);
+{
+    "id": "1d6f56f4-0362-4d0f-b547-ddff993bfb53",
+    "uniqueKey": "order-p-9902",
+    "queueName": "default",
+    "status": "PENDING",
+    "priority": 5,
+    "currentRetry": 0,
+    "maxRetries": 3,
+    "payload": "{\"action\": \"SEND_INVOICE\", \"orderId\": 9902}",
+    "lastError": null,
+    "executeAt": "2026-09-04T12:19:26.113606100Z",
+    "createdAt": "2026-09-04T12:19:26.116606100Z",
+    "updatedAt": "2026-09-04T12:19:26.116606100Z"
+}
