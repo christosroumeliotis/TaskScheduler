@@ -13,22 +13,21 @@ import java.util.UUID;
 @Repository
 public interface TaskRepository extends JpaRepository<Task, UUID> {
     @Query(value = """
-        SELECT id, 
-        FROM tasks
-        WHERE status IN ('PENDING', 'FAILED')
-          AND execute_at <= NOW(3)
-          AND current_retry < max_retries
-        ORDER BY priority DESC, execute_at ASC
-        LIMIT :batchSize
-        FOR UPDATE SKIP LOCKED
-        """, nativeQuery = true)
-    List<String> fetchPendingTaskIdsForUpdate(@Param("batchSize") int batchSize);
+       SELECT BIN_TO_UUID(id) FROM tasks 
+       WHERE status IN ('PENDING', 'FAILED') 
+         AND execute_at <= NOW(3) 
+         AND current_retry < max_retries 
+       LIMIT :batchSize 
+       FOR UPDATE SKIP LOCKED
+    """, nativeQuery = true)
+    List<UUID> fetchPendingTaskIdsForUpdate(@Param("batchSize") int batchSize);
 
     @Modifying
-    @Query(value = """
-        UPDATE tasks
-        SET status = 'QUEUED', updated_at = NOW(3)
-        WHERE id IN (:ids)
-        """, nativeQuery = true)
-    void markTasksAsQueued(@Param("ids") List<String> ids);
+    @Query("""
+    UPDATE Task t
+    SET t.status = com.task.scheduler.core.domain.TaskStatus.QUEUED, 
+        t.updatedAt = CURRENT_TIMESTAMP
+    WHERE t.id IN (:ids)
+    """)
+    void markTasksAsQueued(@Param("ids") List<UUID> ids);
 }

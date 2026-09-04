@@ -1,25 +1,18 @@
 package com.task.scheduler.core.service;
 
 import com.task.scheduler.core.domain.Task;
-import com.task.scheduler.core.repository.TaskRepository;
-import jakarta.transaction.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.redis.connection.stream.RecordId;
+import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
 
+@Service
+@EnableScheduling
 public class TaskSchedulerPoller {
 
-    @Autowired
-    TaskRepository taskRepository;
-
-    private static final int BATCH_SIZE = 100;
     private static final Logger logger = LoggerFactory.getLogger(TaskSchedulerPoller.class);
     private final TaskProducerService taskProducerService;
 
@@ -28,30 +21,21 @@ public class TaskSchedulerPoller {
     }
 
     @Scheduled(fixedRate = 1000)
-    @Transactional
+    //@Transactional
     public void pollAndEnqueueTasks() {
-        List<String> tasksIdsRetrieved = taskRepository.fetchPendingTaskIdsForUpdate(BATCH_SIZE);
-        if (tasksIdsRetrieved.isEmpty())
+        List<Task> tasksRetrieved = taskProducerService.lockAndMarkTasksQueued();
+        if (tasksRetrieved.isEmpty()) {
+            logger.info("No tasks found for execution at this time.");
             return;
-        logger.info("Retrieved {} tasks for enqueuing", tasksIdsRetrieved.size());
-
-        List<Task> tasksToBeQueued = new ArrayList<>();
-        for (String taskId : tasksIdsRetrieved) {
-            Optional<Task> taskRetrieved = taskRepository.findById(UUID.fromString(taskId));
-            taskRetrieved.ifPresent(tasksToBeQueued::add);
         }
+        logger.info("Retrieved and enqueued {} tasks", tasksRetrieved.size());
 
-        List<Task> tasksQueued = new ArrayList<>();
-        for (Task task : tasksToBeQueued) {
+        for (Task task : tasksRetrieved) {
             try {
                 taskProducerService.publishToStream(task);
-                tasksQueued.add(task);
             } catch (Exception e) {
                 logger.error("Error while publishing task {} to stream: {}", task.getId(), e.getMessage());
             }
         }
-        taskRepository.markTasksAsQueued(tasksQueued.stream()
-                .map(m -> m.getId().toString())
-                .toList());
     }
 }
