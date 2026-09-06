@@ -1,0 +1,9 @@
+target/
+*.log
+*.tmp
+docker-compose.override.yml
+.git
+.gitignore
+.idea
+.vscode
+.DS_Store
