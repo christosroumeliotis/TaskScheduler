@@ -5,6 +5,10 @@ import com.task.scheduler.core.DTOs.TaskResponse;
 import com.task.scheduler.core.service.TaskApiService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.interceptor.SimpleKey;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -27,24 +31,17 @@ public class TaskSubmissionController {
     @PostMapping("/submit/multiple")
     public ResponseEntity<String> submitMultipleTask() {
 
-        TaskSubmission taskSubmission = new TaskSubmission(taskApiService);
+        Boolean startedSuccessfully = taskApiService.beginThreads();
+        if(startedSuccessfully)
+            return ResponseEntity.status(HttpStatus.OK).body("Threads started!");
+         else
+            return ResponseEntity.internalServerError().body("Threads did not start!");
+    }
 
-        Thread thread1 = new Thread(taskSubmission);
-        Thread thread2 = new Thread(taskSubmission);
-        Thread thread3 = new Thread(taskSubmission);
-
-        thread1.start();
-        thread2.start();
-        thread3.start();
-
-//        try {
-//            thread1.join();
-//            thread2.join();
-//            thread3.join();
-//        } catch (InterruptedException e) {
-//            throw new RuntimeException(e);
-//        }
-        return ResponseEntity.status(HttpStatus.OK).body("Threads started!");
+    @PutMapping("/submit/multiple")
+    public ResponseEntity<String> stopMultipleTask() {
+        taskApiService.stopMultipleTaskSubmission();
+        return ResponseEntity.status(HttpStatus.OK).body("Threads stopped!");
     }
 
     @ExceptionHandler(IllegalStateException.class)
@@ -53,31 +50,4 @@ public class TaskSubmissionController {
     }
 }
 
-class TaskSubmission implements Runnable {
 
-
-    private final TaskApiService taskApiService;
-    private final AtomicInteger taskCounter = new AtomicInteger(0);
-
-    public TaskSubmission(TaskApiService taskApiService) {
-        this.taskApiService = taskApiService;
-    }
-
-    @Override
-    public void run() {
-        while (true) {
-            TaskRequest request = TaskRequest.builder()
-                    .uniqueKey("Task-" + Thread.currentThread().getName() + "-" + taskCounter.incrementAndGet())
-                    .payload("{\"action\": \"SEND_INVOICE\", \"orderId\": 9999}")
-                    .maxRetries(3)
-                    .build();
-            taskApiService.submitTask(request);
-
-            try {
-                Thread.sleep(2000);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
-        }
-    }
-}
