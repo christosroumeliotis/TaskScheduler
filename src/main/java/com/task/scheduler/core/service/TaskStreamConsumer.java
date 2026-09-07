@@ -1,6 +1,5 @@
 package com.task.scheduler.core.service;
 
-import com.task.scheduler.config.RedisStreamInitializer;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
@@ -28,6 +27,9 @@ public class TaskStreamConsumer implements StreamListener<String, MapRecord<Stri
     private Subscription subscription;
     private final TaskExecutionService executionService;
 
+    public static final String QUEUE_NAME = "default";
+    public static final String CONSUMER_GROUP = "worker-group";
+
     public TaskStreamConsumer(StringRedisTemplate redisTemplate, TaskExecutionService executionService) {
         this.redisTemplate = redisTemplate;
         this.executionService = executionService;
@@ -35,6 +37,14 @@ public class TaskStreamConsumer implements StreamListener<String, MapRecord<Stri
 
     @PostConstruct
     public void startConsumer() {
+
+        try {
+            redisTemplate.opsForStream().createGroup(QUEUE_NAME, ReadOffset.from("0"), CONSUMER_GROUP);
+            log.info("Created Consumer Group '{}' on Stream '{}'", CONSUMER_GROUP, QUEUE_NAME);
+        } catch (Exception e) {
+            log.debug("Consumer group already exists", e);
+        }
+
         StreamMessageListenerContainer.StreamMessageListenerContainerOptions<String,
                 MapRecord<String, String, String>> options =
                 StreamMessageListenerContainer.StreamMessageListenerContainerOptions
@@ -45,12 +55,12 @@ public class TaskStreamConsumer implements StreamListener<String, MapRecord<Stri
         container = StreamMessageListenerContainer.create(redisTemplate.getConnectionFactory(), options);
 
         subscription = container.receive(
-                Consumer.from(RedisStreamInitializer.CONSUMER_GROUP, workerId),
-                StreamOffset.create(RedisStreamInitializer.QUEUE_NAME, ReadOffset.lastConsumed()),
+                Consumer.from(CONSUMER_GROUP, workerId),
+                StreamOffset.create(QUEUE_NAME, ReadOffset.lastConsumed()),
                 this
         );
         container.start();
-        log.info("Started Redis Worker Listener [{}] for stream [{}]", workerId, RedisStreamInitializer.QUEUE_NAME);
+        log.info("Started Redis Worker Listener [{}] for stream [{}]", workerId, QUEUE_NAME);
     }
 
     @Override
@@ -59,8 +69,8 @@ public class TaskStreamConsumer implements StreamListener<String, MapRecord<Stri
             executionService.processTaskExecution(record.getValue(), workerId);
 
             redisTemplate.opsForStream().acknowledge(
-                    RedisStreamInitializer.QUEUE_NAME,
-                    RedisStreamInitializer.CONSUMER_GROUP,
+                    QUEUE_NAME,
+                    CONSUMER_GROUP,
                     record.getId()
             );
         } catch (Exception e) {
