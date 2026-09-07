@@ -13,6 +13,13 @@ import java.io.IOException;
 @Order(-1)
 public class RateLimitFilter implements Filter {
 
+    private JedisPool jedisPool;
+
+    @Override
+    public void init(FilterConfig config) {
+        jedisPool = new JedisPool("localhost", 6379);
+    }
+
     @Override
     public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain)
             throws IOException, ServletException {
@@ -20,7 +27,7 @@ public class RateLimitFilter implements Filter {
         HttpServletResponse httpRes = (HttpServletResponse) res;
 
         String key = "ip:" + httpReq.getRemoteAddr();
-        boolean result = SlidingWindowCounterLimiter.allow(new JedisPool("localhost", 6379), key, 5, 60);
+        boolean result = SlidingWindowCounterLimiter.allow(jedisPool, key, 5, 60);
 
         if (result) {
             httpRes.setStatus(429);
