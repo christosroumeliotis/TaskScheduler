@@ -13,11 +13,10 @@ import java.io.IOException;
 @Order(-1)
 public class RateLimitFilter implements Filter {
 
-    private JedisPool jedisPool;
+    private final JedisPool jedisPool;
 
-    @Override
-    public void init(FilterConfig config) {
-        jedisPool = new JedisPool("localhost", 6379);
+    public RateLimitFilter(JedisPool jedisPool) {
+        this.jedisPool = jedisPool;
     }
 
     @Override
@@ -29,7 +28,8 @@ public class RateLimitFilter implements Filter {
         String key = "ip:" + httpReq.getRemoteAddr();
         boolean result = SlidingWindowCounterLimiter.allow(jedisPool, key, 5, 60);
 
-        if (result) {
+        if (!result) {
+            System.err.println("Rate limit exceeded for IP: " + httpReq.getRemoteAddr());
             httpRes.setStatus(429);
             httpRes.getWriter().write("{\"error\": \"Rate limit exceeded\"}");
             return;

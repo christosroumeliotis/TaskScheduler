@@ -25,6 +25,7 @@ public class TaskSubmissionController {
     @PostMapping("/submit")
     public ResponseEntity<TaskResponse> submitTask(@Valid @RequestBody TaskRequest request) {
         TaskResponse response = taskApiService.submitTask(request);
+        System.out.println("Task submitted: " + response);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 

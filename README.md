@@ -8,6 +8,7 @@ A lightweight Java Spring Boot task scheduling service that uses Redis Streams f
 - Consumer group support for scalable workers
 - MySQL data storage
 - Docker Compose setup for app, MySQL and Redis
+- Rate limiter using a Redis-backed sliding window counter (per-key request limiting)
 
 ## Key components
 
@@ -15,6 +16,7 @@ A lightweight Java Spring Boot task scheduling service that uses Redis Streams f
 - src/main/java/com/task/scheduler/config/RedisStreamInitializer.java — stream and consumer-group initializer
 - src/main/java/com/task/scheduler/core/service/TaskProducerService.java — pushes tasks to the Redis stream
 - src/main/java/com/task/scheduler/core/service/TaskStreamConsumer.java — stream consumer that processes tasks
+- src/main/java/com/task/scheduler/filter/SlidingWindowCounterLimiter.java — Servlet filter implementing a Redis-backed sliding-window rate limiter
 - docker-compose.yml — app, db (MySQL) and redis services
 
 ## Requirements
@@ -44,8 +46,6 @@ A lightweight Java Spring Boot task scheduling service that uses Redis Streams f
 ## Run locally (without Docker)
 
 1. Configure `src/main/resources/application.properties` or provide environment variables matching Spring properties:
-   - spring.redis.host
-   - spring.redis.port
    - spring.datasource.url
    - spring.datasource.username
    - spring.datasource.password
@@ -60,49 +60,12 @@ A lightweight Java Spring Boot task scheduling service that uses Redis Streams f
 - Stream name: `default`
 - Consumer group: `worker-group`
 
-The code attempts to create the consumer group on startup (see RedisStreamInitializer), but the consumer may start earlier than the initializer in some environments. If you see errors like:
+## Rate limiter (Sliding window with Redis)
 
-  NOGROUP No such key 'default' or consumer group 'worker-group' in XREADGROUP
+A Redis-backed sliding-window rate limiter has been added to support per-key request limiting. It uses a time-windowed counter stored in Redis to make rate checks accurate and efficient across distributed instances.
 
-Either create the group manually in Redis or ensure the application creates it before subscribing.
+Key details
 
-Manual creation command (run inside the redis container):
-
-  docker compose exec redis redis-cli XGROUP CREATE default worker-group $ MKSTREAM
-
-Or from any redis-cli pointing at the redis service:
-
-  redis-cli -h redis XGROUP CREATE default worker-group $ MKSTREAM
-
-Recommended fix in code: ensure the consumer creates the group right before subscribing (see TaskStreamConsumer.startConsumer()).
-
-## Troubleshooting Redis connectivity
-
-1. Confirm environment variables inside the app container:
-
-   docker compose exec app printenv SPRING_REDIS_HOST SPRING_REDIS_PORT
-
-2. Confirm the app uses those values (RedisConfig reads `spring.redis.host` and `spring.redis.port`).
-
-3. Test connectivity from the app container:
-
-   docker compose exec app ping redis
-   docker compose exec app redis-cli -h redis ping
-
-4. Check service health and ports:
-
-   docker compose ps
-   docker compose logs redis
-
-## Useful Maven dependencies
-
-- spring-boot-starter-data-redis-reactive
-- spring-data-redis (Lettuce)
-
-## Contributing
-
-Contributions and improvements welcome. Open issues or PRs with clear descriptions.
-
-## License
-
-MIT (or choose your preferred license)
+- Implementation: src/main/java/com/task/scheduler/filter/SlidingWindowCounterLimiter.java — a Servlet Filter that enforces limits per key (e.g., IP or API key).
+- Algorithm: sliding-window counter using Redis sorted sets or timestamps to count requests within a rolling window.
+- Estimated Count = (Previous Window Requests x (1 - current window elapsed time)) + Current Window Requests
