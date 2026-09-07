@@ -10,7 +10,8 @@ import org.springframework.data.redis.core.RedisTemplate;
 @Configuration
 public class RedisConfig {
 
-    @Bean LettuceConnectionFactory connectionFactory(@Value("${spring.redis.host:localhost}") String host,
+    @Bean
+    LettuceConnectionFactory connectionFactory(@Value("${spring.redis.host:localhost}") String host,
                                                      @Value("${spring.redis.port:6379}") int port) {
         return new LettuceConnectionFactory(host, port);
     }
